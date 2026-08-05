@@ -24,7 +24,8 @@ constexpr uint8_t kVescCommSetDuty = 5;
 HardwareSerial VescSerial(1);
 std::array<String, 10> gScreenLines;
 size_t gScreenCount = 0;
-bool gOutputsInitialized = false;
+bool gPcaInitialized = false;
+bool gVescInitialized = false;
 Preferences gPreferences;
 servo_limit_settings_t gServoLimits = {-100, 100, -100, 100, -100, 100};
 
@@ -203,53 +204,54 @@ void outputs_setup(void)
     loadServoLimits();
 
     Wire.begin(CONTROL_I2C_SDA_PIN, CONTROL_I2C_SCL_PIN);
-    if (!pcaProbe()) {
-        debug_logf("PCA9685 not found at 0x%02X on SDA=%d SCL=%d",
-                   CONTROL_PCA9685_ADDR, CONTROL_I2C_SDA_PIN, CONTROL_I2C_SCL_PIN);
-        screen_statusf("PCA9685 not found");
-        return;
+    if (pcaProbe()) {
+        pcaWrite8(kPcaMode1, 0x10); /* sleep before prescale */
+        pcaWrite8(kPcaPrescale, static_cast<uint8_t>((25000000.0 / (4096.0 * CONTROL_PCA9685_FREQ)) - 1.0 + 0.5));
+        pcaWrite8(kPcaMode1, 0x00);
+        delay(5);
+        pcaWrite8(kPcaMode1, 0xa1); /* auto-increment + restart */
+
+        setServoNormalized(CONTROL_SERVO_LEFT_WING_CH, 0, gServoLimits.left_wing_min, gServoLimits.left_wing_max);
+        setServoNormalized(CONTROL_SERVO_RIGHT_WING_CH, 0, gServoLimits.right_wing_min, gServoLimits.right_wing_max);
+        setServoNormalized(CONTROL_SERVO_VECTOR_CH, 0, gServoLimits.vector_min, gServoLimits.vector_max);
+        gPcaInitialized = true;
+        debug_logf("PCA9685 ready at 0x%02X", CONTROL_PCA9685_ADDR);
+        screen_statusf("PCA9685 OK @0x%02X", CONTROL_PCA9685_ADDR);
+    } else {
+        debug_logf("PCA9685 not found at 0x%02X on SDA=%d SCL=%d; servo output disabled",
+         CONTROL_PCA9685_ADDR, CONTROL_I2C_SDA_PIN, CONTROL_I2C_SCL_PIN);
+        screen_statusf("PCA9685 absent / servo off");
     }
 
-    pcaWrite8(kPcaMode1, 0x10); /* sleep before prescale */
-    pcaWrite8(kPcaPrescale, static_cast<uint8_t>((25000000.0 / (4096.0 * CONTROL_PCA9685_FREQ)) - 1.0 + 0.5));
-    pcaWrite8(kPcaMode1, 0x00);
-    delay(5);
-    pcaWrite8(kPcaMode1, 0xa1); /* auto-increment + restart */
-
-    setServoNormalized(CONTROL_SERVO_LEFT_WING_CH, 0, gServoLimits.left_wing_min, gServoLimits.left_wing_max);
-    setServoNormalized(CONTROL_SERVO_RIGHT_WING_CH, 0, gServoLimits.right_wing_min, gServoLimits.right_wing_max);
-    setServoNormalized(CONTROL_SERVO_VECTOR_CH, 0, gServoLimits.vector_min, gServoLimits.vector_max);
-
     VescSerial.begin(CONTROL_VESC_UART_BAUD, SERIAL_8N1,
-                     CONTROL_VESC_UART_RX_PIN, CONTROL_VESC_UART_TX_PIN);
+           CONTROL_VESC_UART_RX_PIN, CONTROL_VESC_UART_TX_PIN);
     vescSendDuty(0.0f);
-    gOutputsInitialized = true;
-    debug_logf("Outputs ready: PCA9685@0x%02X, VESC UART %d baud duty_max=%.2f",
-               CONTROL_PCA9685_ADDR, CONTROL_VESC_UART_BAUD, CONTROL_VESC_MAX_DUTY);
-    screen_statusf("PCA9685 OK @0x%02X", CONTROL_PCA9685_ADDR);
+    gVescInitialized = true;
+    debug_logf("VESC UART ready: %d baud duty_max=%.2f",
+     CONTROL_VESC_UART_BAUD, CONTROL_VESC_MAX_DUTY);
     screen_statusf("VESC duty max %.2f", CONTROL_VESC_MAX_DUTY);
     debug_logf("Servo limits LW[%d,%d] RW[%d,%d] V[%d,%d]",
-               gServoLimits.left_wing_min, gServoLimits.left_wing_max,
-               gServoLimits.right_wing_min, gServoLimits.right_wing_max,
-               gServoLimits.vector_min, gServoLimits.vector_max);
+     gServoLimits.left_wing_min, gServoLimits.left_wing_max,
+     gServoLimits.right_wing_min, gServoLimits.right_wing_max,
+     gServoLimits.vector_min, gServoLimits.vector_max);
 }
 
 void outputs_apply(int leftWing, int rightWing, int vectorServo, int motorSpeed)
 {
-    if (!gOutputsInitialized) {
-        return;
+    if (gPcaInitialized) {
+        setServoNormalized(CONTROL_SERVO_LEFT_WING_CH, leftWing,
+                 gServoLimits.left_wing_min, gServoLimits.left_wing_max);
+        setServoNormalized(CONTROL_SERVO_RIGHT_WING_CH, rightWing,
+                 gServoLimits.right_wing_min, gServoLimits.right_wing_max);
+        setServoNormalized(CONTROL_SERVO_VECTOR_CH, vectorServo,
+                 gServoLimits.vector_min, gServoLimits.vector_max);
     }
 
-    setServoNormalized(CONTROL_SERVO_LEFT_WING_CH, leftWing,
-                       gServoLimits.left_wing_min, gServoLimits.left_wing_max);
-    setServoNormalized(CONTROL_SERVO_RIGHT_WING_CH, rightWing,
-                       gServoLimits.right_wing_min, gServoLimits.right_wing_max);
-    setServoNormalized(CONTROL_SERVO_VECTOR_CH, vectorServo,
-                       gServoLimits.vector_min, gServoLimits.vector_max);
-
-    const float duty = CONTROL_VESC_MAX_DUTY *
-                       static_cast<float>(constrain(motorSpeed, 0, 100)) / 100.0f;
-    vescSendDuty(duty);
+    if (gVescInitialized) {
+        const float duty = CONTROL_VESC_MAX_DUTY *
+                 static_cast<float>(constrain(motorSpeed, 0, 100)) / 100.0f;
+        vescSendDuty(duty);
+    }
 }
 
 extern "C" bool outputs_get_servo_limits(servo_limit_settings_t *limits)
@@ -272,7 +274,7 @@ extern "C" bool outputs_set_servo_limits(const servo_limit_settings_t *limits, b
         saveServoLimits();
     }
 
-    if (gOutputsInitialized) {
+    if (gPcaInitialized) {
         setServoNormalized(CONTROL_SERVO_LEFT_WING_CH, 0,
                            gServoLimits.left_wing_min, gServoLimits.left_wing_max);
         setServoNormalized(CONTROL_SERVO_RIGHT_WING_CH, 0,
