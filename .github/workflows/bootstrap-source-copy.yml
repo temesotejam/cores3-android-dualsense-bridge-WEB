@@ -46,3 +46,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Copy CoreS3 DualSense bridge source"
           git push
+
+# Merged once to trigger the initial exact source copy.
