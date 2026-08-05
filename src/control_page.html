@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CoreS3 Control</title>
+<style>
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  padding: 20px;
+  background: #111827;
+  color: #f8fafc;
+}
+main {
+  max-width: 640px;
+  margin: auto;
+}
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 12px;
+}
+.status, .panel {
+  padding: 14px;
+  border-radius: 10px;
+  background: #1f2937;
+  margin: 12px 0;
+}
+.ok { color: #86efac; }
+.warn { color: #fbbf24; }
+.bad { color: #fca5a5; }
+button, select {
+  min-height: 48px;
+  padding: 0 14px;
+  margin: 8px 6px 8px 0;
+  border: 0;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+select {
+  background: #e5e7eb;
+  color: #111827;
+}
+#connect, #resume {
+  background: #22c55e;
+  color: #052e16;
+}
+#stop {
+  background: #ef4444;
+  color: white;
+}
+code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border-radius: 8px;
+  background: #030712;
+}
+.note {
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.metric {
+  padding: 12px;
+  border-radius: 10px;
+  background: #111827;
+  border: 1px solid #374151;
+}
+.metric-title {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+.metric-value {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+.hint {
+  font-size: 0.85rem;
+  color: #93c5fd;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.label {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+details {
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #111827;
+}
+summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+.settings-grid input {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #e5e7eb;
+  color: #111827;
+  font-size: 1rem;
+}
+.settings-head {
+  color: #93c5fd;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.bars-panel,
+.motor-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bar-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #374151;
+  background: #111827;
+}
+.bar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.bar-title {
+  font-size: 0.92rem;
+  color: #cbd5e1;
+  font-weight: 700;
+}
+.bar-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+.bar-track {
+  position: relative;
+  height: 18px;
+  border-radius: 999px;
+  background: #0b1220;
+  overflow: hidden;
+  border: 1px solid #233044;
+}
+.bar-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(148, 163, 184, 0.45);
+  transform: translateX(-50%);
+}
+.bar-fill-bidir {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+}
+.bar-fill-bidir.left {
+  right: 50%;
+  background: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%);
+}
+.bar-fill-bidir.right {
+  left: 50%;
+  background: linear-gradient(90deg, #38bdf8 0%, #0ea5e9 100%);
+}
+.bar-fill-warm.left {
+  background: linear-gradient(90deg, #f59e0b 0%, #facc15 100%);
+}
+.bar-fill-warm.right {
+  background: linear-gradient(90deg, #facc15 0%, #f59e0b 100%);
+}
+.motor-bar {
+  position: relative;
+  height: 168px;
+  border-radius: 14px;
+  border: 1px solid #374151;
+  background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+  overflow: hidden;
+}
+.motor-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  background: linear-gradient(180deg, #fde047 0%, #f59e0b 55%, #dc2626 100%);
+}
+.motor-scale {
+  display: flex;
+  justify-content: space-between;
+  color: #93c5fd;
+  font-size: 0.8rem;
+}
+.pill-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pill {
+  min-width: 84px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.pill.active {
+  color: #052e16;
+  background: #86efac;
+  border-color: #86efac;
+}
+@media (max-width: 720px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+<main>
+  <h1>CoreS3 コントローラ</h1>
+  <div id="status" class="status warn">未接続</div>
+  <div class="row">
+    <button id="connect">接続開始</button>
+    <button id="stop">非常停止</button>
+    <button id="resume">停止解除</button>
+  </div>
+  <div class="panel">
+    <div class="row">
+      <span class="label">入力プロファイル</span>
+      <select id="profile">
+        <option value="lg-style3">LG style3 推奨</option>
+        <option value="auto">自動判定</option>
+        <option value="standard">標準 Gamepad</option>
+        <option value="android-chrome-shifted">Android Chrome ずれ配列</option>
+      </select>
+    </div>
+    <p class="note">
+      Android の Bluetooth 設定で DualSense を接続してから「接続開始」を押してください。<br>
+      <strong>L1 を押している間だけ</strong>操縦指令を有効にします。<br>
+      このスマホの実測では <strong>L1=B2 / L2=A2+B4 / R2=A3+B5</strong> でした。まずは <strong>LG style3 推奨</strong> で見ます。
+    </p>
+  </div>
+  <div class="panel">
+    <div class="hero">
+      <div class="bars-panel">
+        <div class="bar-card">
+          <div class="bar-head">
+            <div class="bar-title">左翼</div>
+            <div id="leftWingBarValue" class="bar-value">0</div>
+          </div>
+          <div class="bar-track">
+            <div class="bar-center"></div>
+            <div id="leftWingBarLeft" class="bar-fill-bidir left"></div>
+            <div id="leftWingBarRight" class="bar-fill-bidir right"></div>
+          </div>
+        </div>
+        <div class="bar-card">
+          <div class="bar-head">
+            <div class="bar-title">右翼</div>
+            <div id="rightWingBarValue" class="bar-value">0</div>
+          </div>
+          <div class="bar-track">
+            <div class="bar-center"></div>
+            <div id="rightWingBarLeft" class="bar-fill-bidir left"></div>
+            <div id="rightWingBarRight" class="bar-fill-bidir right"></div>
+          </div>
+        </div>
+        <div class="bar-card">
+          <div class="bar-head">
+            <div class="bar-title">左右向きサーボ</div>
+            <div id="vectorBarValue" class="bar-value">0</div>
+          </div>
+          <div class="bar-track">
+            <div class="bar-center"></div>
+            <div id="vectorBarLeft" class="bar-fill-bidir left bar-fill-warm"></div>
+            <div id="vectorBarRight" class="bar-fill-bidir right bar-fill-warm"></div>
+          </div>
+        </div>
+      </div>
+      <div class="motor-gauge">
+        <div class="metric">
+          <div class="metric-title">モータ速度</div>
+          <div id="motorValue" class="metric-value">0</div>
+          <div class="hint">十字キー 上/下 で増減</div>
+        </div>
+        <div class="motor-bar">
+          <div id="motorFill" class="motor-fill"></div>
+        </div>
+        <div class="motor-scale">
+          <span>0%</span>
+          <span>100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="grid">
+      <div class="metric">
+        <div class="metric-title">左翼</div>
+        <div id="forwardValue" class="metric-value">0</div>
+        <div class="hint">左スティック上下</div>
+      </div>
+      <div class="metric">
+        <div class="metric-title">右翼</div>
+        <div id="turnValue" class="metric-value">0</div>
+        <div class="hint">右スティック上下</div>
+      </div>
+      <div class="metric">
+        <div class="metric-title">左向きサーボ</div>
+        <div id="l2Value" class="metric-value">0</div>
+        <div class="hint">L2</div>
+      </div>
+      <div class="metric">
+        <div class="metric-title">右向きサーボ</div>
+        <div id="r2Value" class="metric-value">0</div>
+        <div class="hint">R2</div>
+      </div>
+      <div class="metric">
+        <div class="metric-title">L1</div>
+        <div id="l1Value" class="metric-value">OFF</div>
+        <div class="hint">押している間だけ有効</div>
+      </div>
+      <div class="metric">
+        <div class="metric-title">非常停止</div>
+        <div id="stopValue" class="metric-value">OFF</div>
+        <div class="hint">PS または赤ボタン</div>
+      </div>
+    </div>
+    <div class="pill-row" style="margin-top:12px">
+      <div id="l1Pill" class="pill">L1 OFF</div>
+      <div id="upPill" class="pill">上 OFF</div>
+      <div id="downPill" class="pill">下 OFF</div>
+      <div id="stopPill" class="pill">停止 OFF</div>
+    </div>
+  </div>
+  <div class="panel">
+    <strong>見方</strong>
+    <p class="note">
+      上のバーで、左翼・右翼・左右向きサーボ・モータ速度がすぐ見えるようにしています。<br>
+      左右に動くバーは中央が 0、右の縦バーはモータ速度です。下の数値は確認用です。<br>
+      左スティック上下が「左翼」、右スティック上下が「右翼」、`L2 / R2` が左右向きサーボです。<br>
+      十字キー `上/下` を長押しするとモータ速度が連続で増減し、L1 を離すと速度は 0 に戻ります。
+    </p>
+  </div>
+  <div class="panel">
+    <details>
+      <summary>サーボ角度制限</summary>
+      <p class="note">
+        左翼、右翼、左右向きサーボの下限と上限です。`-100` から `100` の範囲で入れてください。保存すると電源を切っても残ります。
+      </p>
+      <div class="settings-grid">
+        <div></div>
+        <div class="settings-head">下限</div>
+        <div class="settings-head">上限</div>
+        <div class="label">左翼</div>
+        <input id="leftWingMin" type="number" min="-100" max="100" step="1">
+        <input id="leftWingMax" type="number" min="-100" max="100" step="1">
+        <div class="label">右翼</div>
+        <input id="rightWingMin" type="number" min="-100" max="100" step="1">
+        <input id="rightWingMax" type="number" min="-100" max="100" step="1">
+        <div class="label">左右向き</div>
+        <input id="vectorMin" type="number" min="-100" max="100" step="1">
+        <input id="vectorMax" type="number" min="-100" max="100" step="1">
+      </div>
+      <div class="row">
+        <button id="saveServoLimits">保存</button>
+        <div id="servoLimitsStatus" class="hint">現在値を読み込み中...</div>
+      </div>
+    </details>
+  </div>
+  <code id="telemetry">gamepad: 未検出</code>
+</main>
+<script>
+(() => {
+  const status = document.getElementById("status");
+  const telemetry = document.getElementById("telemetry");
+  const connect = document.getElementById("connect");
+  const stop = document.getElementById("stop");
+  const resume = document.getElementById("resume");
+  const profileSelect = document.getElementById("profile");
+  const forwardValue = document.getElementById("forwardValue");
+  const turnValue = document.getElementById("turnValue");
+  const l2Value = document.getElementById("l2Value");
+  const r2Value = document.getElementById("r2Value");
+  const l1Value = document.getElementById("l1Value");
+  const leftWingBarValue = document.getElementById("leftWingBarValue");
+  const rightWingBarValue = document.getElementById("rightWingBarValue");
+  const vectorBarValue = document.getElementById("vectorBarValue");
+  const leftWingBarLeft = document.getElementById("leftWingBarLeft");
+  const leftWingBarRight = document.getElementById("leftWingBarRight");
+  const rightWingBarLeft = document.getElementById("rightWingBarLeft");
+  const rightWingBarRight = document.getElementById("rightWingBarRight");
+  const vectorBarLeft = document.getElementById("vectorBarLeft");
+  const vectorBarRight = document.getElementById("vectorBarRight");
+  const motorFill = document.getElementById("motorFill");
+  const l1Pill = document.getElementById("l1Pill");
+  const upPill = document.getElementById("upPill");
+  const downPill = document.getElementById("downPill");
+  const stopPill = document.getElementById("stopPill");
+  const motorValue = document.getElementById("motorValue");
+  const stopValue = document.getElementById("stopValue");
+  const leftWingMinInput = document.getElementById("leftWingMin");
+  const leftWingMaxInput = document.getElementById("leftWingMax");
+  const rightWingMinInput = document.getElementById("rightWingMin");
+  const rightWingMaxInput = document.getElementById("rightWingMax");
+  const vectorMinInput = document.getElementById("vectorMin");
+  const vectorMaxInput = document.getElementById("vectorMax");
+  const saveServoLimits = document.getElementById("saveServoLimits");
+  const servoLimitsStatus = document.getElementById("servoLimitsStatus");
+
+  let ws = null;
+  let sequence = 0;
+  let emergencyStop = false;
+  let rawSequence = 0;
+  let lastRawSentAt = 0;
+  let motorSpeedPreview = 0;
+  let lastMotorStepAt = 0;
+  let rightStickReady = false;
+
+  const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+  const centeredAxis = (value) => Math.round(clamp(value ?? 0, -1, 1) * 100);
+  const buttonLevel = (button) => Math.round(clamp(button?.value ?? 0, 0, 1) * 100);
+  const buttonPressed = (button) => button?.pressed ? 1 : 0;
+  const fmt = (value) => value == null ? "--" : value.toFixed(3);
+  const safePercent = (value) => Number.isFinite(value) ? value : 0;
+  const MOTOR_SPEED_STEP = 5;
+  const MOTOR_SPEED_REPEAT_MS = 120;
+  const RIGHT_STICK_NEUTRAL_BAND = 12;
+
+  function setStatus(text, kind) {
+    status.textContent = text;
+    status.className = "status " + kind;
+  }
+
+  function setServoLimitsStatus(text, ok = false) {
+    servoLimitsStatus.textContent = text;
+    servoLimitsStatus.className = ok ? "ok" : "hint";
+  }
+
+  function applyServoLimitInputs(limits) {
+    leftWingMinInput.value = String(limits.leftWingMin);
+    leftWingMaxInput.value = String(limits.leftWingMax);
+    rightWingMinInput.value = String(limits.rightWingMin);
+    rightWingMaxInput.value = String(limits.rightWingMax);
+    vectorMinInput.value = String(limits.vectorMin);
+    vectorMaxInput.value = String(limits.vectorMax);
+  }
+
+  function readServoLimitInputs() {
+    return {
+      leftWingMin: Number(leftWingMinInput.value),
+      leftWingMax: Number(leftWingMaxInput.value),
+      rightWingMin: Number(rightWingMinInput.value),
+      rightWingMax: Number(rightWingMaxInput.value),
+      vectorMin: Number(vectorMinInput.value),
+      vectorMax: Number(vectorMaxInput.value)
+    };
+  }
+
+  function validServoLimits(limits) {
+    const values = Object.values(limits);
+    if (values.some((value) => !Number.isFinite(value) || value < -100 || value > 100)) {
+      return false;
+    }
+    return limits.leftWingMin < limits.leftWingMax &&
+           limits.rightWingMin < limits.rightWingMax &&
+           limits.vectorMin < limits.vectorMax;
+  }
+
+  async function loadServoLimits() {
+    try {
+      const response = await fetch("/api/servo-limits", { cache: "no-store" });
+      if (!response.ok) throw new Error("load failed");
+      const limits = await response.json();
+      applyServoLimitInputs(limits);
+      setServoLimitsStatus("現在値を読み込みました", true);
+    } catch (error) {
+      setServoLimitsStatus("読み込み失敗");
+    }
+  }
+
+  async function saveServoLimitsNow() {
+    const limits = readServoLimitInputs();
+    if (!validServoLimits(limits)) {
+      setServoLimitsStatus("下限と上限を見直してください");
+      return;
+    }
+
+    try {
+      const body = new URLSearchParams();
+      Object.entries(limits).forEach(([key, value]) => body.set(key, String(value)));
+      const response = await fetch("/api/servo-limits", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body
+      });
+      if (!response.ok) throw new Error("save failed");
+      const saved = await response.json();
+      applyServoLimitInputs(saved);
+      setServoLimitsStatus("保存しました", true);
+    } catch (error) {
+      setServoLimitsStatus("保存失敗");
+    }
+  }
+
+  function axisTriggerLevel(value) {
+    if (value == null || Number.isNaN(value)) return null;
+    const clamped = clamp(value, -1, 1);
+    if (clamped < 0) return Math.round(((clamped + 1) / 2) * 100);
+    return Math.round(clamped * 100);
+  }
+
+  function centeredButtonAxis(button) {
+    const raw = buttonLevel(button);
+    return clamp(Math.round((raw - 50) * 2), -100, 100);
+  }
+
+  function chooseTrigger(pad, buttonIndex, axisIndex) {
+    const fromButton = buttonIndex == null ? 0 : buttonLevel(pad.buttons[buttonIndex]);
+    const fromAxis = axisIndex == null ? null : axisTriggerLevel(pad.axes[axisIndex]);
+    if ((fromAxis ?? 0) > 0) {
+      return { value: fromAxis, source: `A${axisIndex}` };
+    }
+    if (fromButton > 0 || pad.buttons[buttonIndex]?.pressed) {
+      return { value: fromButton, source: `B${buttonIndex}` };
+    }
+    if (fromAxis != null) return { value: fromAxis, source: `A${axisIndex}` };
+    return { value: fromButton, source: `B${buttonIndex}` };
+  }
+
+  function filteredRightStickY(button) {
+    const raw = centeredButtonAxis(button);
+    if (!rightStickReady) {
+      if (Math.abs(raw) <= RIGHT_STICK_NEUTRAL_BAND) {
+        rightStickReady = true;
+      } else {
+        return 0;
+      }
+    }
+    return raw;
+  }
+
+  function profileForPad(pad) {
+    const selected = profileSelect.value;
+    if (selected === "lg-style3") {
+      return {
+        name: "LG style3 推奨",
+        leftX: 0,
+        leftY: 1,
+        rightX: 2,
+        rightY: 3,
+        l1: 2,
+        ps: 16,
+        l2Button: 4,
+        r2Button: 5,
+        l2Axis: 2,
+        r2Axis: 3
+      };
+    }
+    if (selected === "standard") {
+      return {
+        name: "標準 Gamepad",
+        leftX: 0,
+        leftY: 1,
+        rightX: 2,
+        rightY: 3,
+        l1: 2,
+        ps: 16,
+        l2Button: 4,
+        r2Button: 5,
+        l2Axis: 2,
+        r2Axis: 3
+      };
+    }
+    if (selected === "android-chrome-shifted") {
+      return {
+        name: "Android Chrome ずれ配列",
+        leftX: 0,
+        leftY: 1,
+        rightX: 2,
+        rightY: 3,
+        l1: 2,
+        ps: 16,
+        l2Button: 4,
+        r2Button: 5,
+        l2Axis: 2,
+        r2Axis: 3
+      };
+    }
+
+    const hasAxis45 = pad.axes.length >= 6;
+    return {
+      name: hasAxis45 ? "自動判定: 軸/ボタン併用" : "自動判定: 標準寄り",
+      leftX: 0,
+      leftY: 1,
+      rightX: 2,
+      rightY: 3,
+      l1: 2,
+      ps: 16,
+      l2Button: 4,
+      r2Button: 5,
+      l2Axis: hasAxis45 ? 2 : null,
+      r2Axis: hasAxis45 ? 3 : null
+    };
+  }
+
+  function collectState(pad) {
+    const profile = profileForPad(pad);
+    const l2 = chooseTrigger(pad, profile.l2Button, profile.l2Axis);
+    const r2 = chooseTrigger(pad, profile.r2Button, profile.r2Axis);
+    const l1 = buttonPressed(pad.buttons[profile.l1]);
+    const ps = emergencyStop || buttonPressed(pad.buttons[profile.ps]);
+
+    return {
+      profile,
+      lx: centeredAxis(pad.axes[profile.leftX]),
+      ly: centeredAxis(pad.axes[profile.leftY]),
+      rx: centeredAxis(pad.axes[profile.rightX]),
+      ry: centeredAxis(pad.axes[profile.rightY]),
+      rightStickY: filteredRightStickY(pad.buttons[7]),
+      l2,
+      r2,
+      l1,
+      dpadUp: buttonPressed(pad.buttons[12]),
+      dpadDown: buttonPressed(pad.buttons[13]),
+      ps
+    };
+  }
+
+  function rawAxesText(pad) {
+    return pad.axes.map((value, index) => `A${index}:${fmt(value)}`).join("  ");
+  }
+
+  function rawButtonsText(pad) {
+    return pad.buttons
+      .map((button, index) => `B${index}:${buttonPressed(button)}/${buttonLevel(button)}`)
+      .join("  ");
+  }
+
+  function rawPacket(pad) {
+    const axis = (index) => centeredAxis(pad.axes[index]);
+    const button = (index) => buttonLevel(pad.buttons[index]);
+    return [
+      "R",
+      rawSequence++,
+      axis(0), axis(1), axis(2), axis(3), axis(4), axis(5), axis(6), axis(7),
+      button(0), button(1), button(2), button(3), button(4), button(5),
+      button(6), button(7), button(12), button(13), button(16), 0
+    ].join(",");
+  }
+
+  function telemetryText(pad, state) {
+    const leftWing = -safePercent(state.ly);
+    const rightWing = -safePercent(state.rightStickY);
+    return [
+      `gamepad: ${pad.id}`,
+      `profile: ${state.profile.name}`,
+      "",
+      "[この画面で見てほしい対応]",
+      `左翼 = ${leftWing}   (左スティック上下)`,
+      `右翼 = ${rightWing}   (右スティック上下)`,
+      `左向きサーボ = ${state.l2.value}   (${state.l2.source})`,
+      `右向きサーボ = ${state.r2.value}   (${state.r2.source})`,
+      `モータ速度変更 = 上:${state.dpadUp} / 下:${state.dpadDown}`,
+      `L1 = ${state.l1 ? "ON" : "OFF"}`,
+      `非常停止 = ${state.ps ? "ON" : "OFF"}`,
+      "",
+      "raw axes",
+      rawAxesText(pad) || "none",
+      "",
+      "raw buttons",
+      rawButtonsText(pad) || "none"
+    ].join("\n");
+  }
+
+  function renderSummary(state) {
+    const leftWing = -safePercent(state.ly);
+    const rightWing = -safePercent(state.rightStickY);
+    const vector = safePercent(state.r2.value) - safePercent(state.l2.value);
+    const motor = safePercent(state.motorSpeed ?? 0);
+
+    forwardValue.textContent = String(leftWing);
+    turnValue.textContent = String(rightWing);
+    l2Value.textContent = String(state.l2.value);
+    r2Value.textContent = String(state.r2.value);
+    l1Value.textContent = state.l1 ? "ON" : "OFF";
+    motorValue.textContent = String(motor);
+    stopValue.textContent = state.ps ? "ON" : "OFF";
+    leftWingBarValue.textContent = String(leftWing);
+    rightWingBarValue.textContent = String(rightWing);
+    vectorBarValue.textContent = String(vector);
+    leftWingBarLeft.style.width = `${Math.max(0, -leftWing)}%`;
+    leftWingBarRight.style.width = `${Math.max(0, leftWing)}%`;
+    rightWingBarLeft.style.width = `${Math.max(0, -rightWing)}%`;
+    rightWingBarRight.style.width = `${Math.max(0, rightWing)}%`;
+    vectorBarLeft.style.width = `${Math.max(0, -vector)}%`;
+    vectorBarRight.style.width = `${Math.max(0, vector)}%`;
+    motorFill.style.height = `${motor}%`;
+
+    l1Pill.textContent = state.l1 ? "L1 ON" : "L1 OFF";
+    upPill.textContent = state.dpadUp ? "上 ON" : "上 OFF";
+    downPill.textContent = state.dpadDown ? "下 ON" : "下 OFF";
+    stopPill.textContent = state.ps ? "停止 ON" : "停止 OFF";
+    l1Pill.className = state.l1 ? "pill active" : "pill";
+    upPill.className = state.dpadUp ? "pill active" : "pill";
+    downPill.className = state.dpadDown ? "pill active" : "pill";
+    stopPill.className = state.ps ? "pill active" : "pill";
+  }
+
+  function packet(forceStop = false) {
+    const pad = [...navigator.getGamepads()].find(Boolean);
+    if (!pad || forceStop) {
+      motorSpeedPreview = 0;
+      lastMotorStepAt = 0;
+      renderSummary({
+        lx: 0,
+        ly: 0,
+        rx: 0,
+        ry: 0,
+        l2: { value: 0 },
+        r2: { value: 0 },
+        l1: 0,
+        dpadUp: 0,
+        dpadDown: 0,
+        motorSpeed: 0,
+        ps: forceStop
+      });
+      telemetry.textContent = forceStop ? "force stop packet sent" : "gamepad: 未検出";
+      return `C,${sequence++},0,0,0,0,0,0,0,0,0,${forceStop ? 1 : 0}`;
+    }
+
+    const state = collectState(pad);
+    const now = Date.now();
+    const speedRepeatReady = lastMotorStepAt === 0 || now - lastMotorStepAt >= MOTOR_SPEED_REPEAT_MS;
+    if (state.l1 && speedRepeatReady && state.dpadUp !== state.dpadDown) {
+      if (state.dpadUp) motorSpeedPreview = clamp(motorSpeedPreview + MOTOR_SPEED_STEP, 0, 100);
+      if (state.dpadDown) motorSpeedPreview = clamp(motorSpeedPreview - MOTOR_SPEED_STEP, 0, 100);
+      lastMotorStepAt = now;
+    }
+    if (!state.l1) {
+      motorSpeedPreview = 0;
+      lastMotorStepAt = 0;
+    }
+    if (state.ps) motorSpeedPreview = 0;
+    state.motorSpeed = motorSpeedPreview;
+    renderSummary(state);
+    telemetry.textContent = telemetryText(pad, state);
+    const leftWing = -safePercent(state.ly);
+    const rightWing = -safePercent(state.rightStickY);
+    const leftWingRaw = safePercent(state.ly);
+    const rightWingRaw = safePercent(state.rightStickY);
+    return `C,${sequence++},${leftWing},${leftWingRaw},${rightWing},${rightWingRaw},${state.l2.value},${state.r2.value},${state.l1},${state.dpadUp},${state.dpadDown},${state.ps ? 1 : 0}`;
+  }
+
+  function send(forceStop = false) {
+    if (ws?.readyState !== WebSocket.OPEN) return;
+    const now = Date.now();
+    ws.send(packet(forceStop));
+    if (!forceStop && now - lastRawSentAt >= 250) {
+      const pad = [...navigator.getGamepads()].find(Boolean);
+      if (pad) {
+        ws.send(rawPacket(pad));
+        lastRawSentAt = now;
+      }
+    }
+  }
+
+  connect.addEventListener("click", () => {
+    if (ws?.readyState === WebSocket.OPEN) return;
+    rightStickReady = false;
+    setStatus("CoreS3 に接続中...", "warn");
+    ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onopen = () => setStatus("接続済み / L1 を押して操縦", "ok");
+    ws.onclose = () => {
+      rightStickReady = false;
+      setStatus("切断 / CoreS3 は停止状態です", "bad");
+    };
+    ws.onerror = () => {
+      rightStickReady = false;
+      setStatus("通信エラー / CoreS3 は停止状態です", "bad");
+    };
+  });
+
+  stop.addEventListener("click", () => {
+    emergencyStop = true;
+    send(true);
+    setStatus("非常停止中 / L1を離してから停止解除", "bad");
+  });
+
+  resume.addEventListener("click", () => {
+    emergencyStop = false;
+    setStatus("停止解除 / L1を離してから押すと操縦できます", "warn");
+  });
+
+  profileSelect.addEventListener("change", () => {
+    const pad = [...navigator.getGamepads()].find(Boolean);
+    if (pad) telemetry.textContent = telemetryText(pad, collectState(pad));
+  });
+  saveServoLimits.addEventListener("click", () => {
+    saveServoLimitsNow();
+  });
+
+  window.addEventListener("gamepadconnected", () => {
+    setStatus("コントローラ検出 / 接続開始を押してください", "warn");
+  });
+
+  window.addEventListener("gamepaddisconnected", () => {
+    rightStickReady = false;
+    emergencyStop = true;
+    send(true);
+    setStatus("コントローラ切断 / 停止しました", "bad");
+  });
+
+  window.addEventListener("pagehide", () => {
+    rightStickReady = false;
+    send(true);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      rightStickReady = false;
+      send(true);
+    }
+  });
+
+  setInterval(send, 33);
+  loadServoLimits();
+})();
+</script>
