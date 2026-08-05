@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>CoreS3 DualSense Bridge Web Installer</title>
+  <meta name="description" content="CoreS3 Android DualSense BridgeをブラウザからM5Stack CoreS3へ書き込むWebインストーラー">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <span class="badge">M5Stack CoreS3 / ESP32-S3</span>
+      <h1>Android DualSense Bridge</h1>
+      <p class="lead">開発環境をインストールせず、USB接続したM5Stack CoreS3へブラウザからファームウェアを書き込みます。</p>
+    </section>
+
+    <section class="card warning">
+      <h2>書き込み前の確認</h2>
+      <p>これはM5Stack CoreS3専用です。書き込みを行うと、CoreS3に現在入っているファームウェアは置き換えられます。</p>
+    </section>
+
+    <section class="card installer">
+      <h2>CoreS3へ書き込む</h2>
+      <ol>
+        <li>CoreS3を通信可能なUSB Type-CケーブルでPCへ接続します。</li>
+        <li>下のボタンを押し、CoreS3のCOMポートを選択します。</li>
+        <li>画面の案内に従ってインストールします。</li>
+      </ol>
+
+      <esp-web-install-button manifest="./manifest.json">
+        <button slot="activate" class="install-button">CoreS3へ書き込む</button>
+        <p slot="unsupported" class="unsupported">このブラウザはWeb Serialに対応していません。PC版ChromeまたはEdgeで開いてください。</p>
+        <p slot="not-allowed" class="unsupported">安全なHTTPSページから開く必要があります。</p>
+      </esp-web-install-button>
+
+      <p class="note">ポートが表示されない場合は、USBケーブル、CoreS3の電源状態、USBドライバを確認してください。</p>
+    </section>
+
+    <section class="card">
+      <h2>書き込み後の使い方</h2>
+      <ol>
+        <li>CoreS3がWi-Fiアクセスポイント <code>CoreS3-Control</code> を起動します。</li>
+        <li>LG style3をそのWi-Fiへ接続します。</li>
+        <li>Android版Chromeで <code>http://192.168.4.1</code> を開きます。</li>
+        <li>DualSenseをLG style3へBluetooth接続し、画面の「接続開始」を押します。</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>現在の出力先</h2>
+      <div class="grid">
+        <article><strong>左翼サーボ</strong><span>PCA9685 CH0</span></article>
+        <article><strong>右翼サーボ</strong><span>PCA9685 CH1</span></article>
+        <article><strong>左右向きサーボ</strong><span>PCA9685 CH2</span></article>
+        <article><strong>推進モータ</strong><span>VESC UART Duty</span></article>
+      </div>
+    </section>
+
+    <footer>
+      <a href="https://github.com/temesotejam/cores3-android-dualsense-bridge-WEB">ソースコードとビルド履歴</a>
+    </footer>
+  </main>
+</body>
+</html>
