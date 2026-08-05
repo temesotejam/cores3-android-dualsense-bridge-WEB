@@ -1,0 +1,154 @@
+name: Build CoreS3 firmware and deploy Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "include/**"
+      - "src/**"
+      - "platformio.ini"
+      - "web/**"
+      - ".github/workflows/build-pages.yml"
+  pull_request:
+    paths:
+      - "include/**"
+      - "src/**"
+      - "platformio.ini"
+      - "web/**"
+      - ".github/workflows/build-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cores3-dualsense-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO
+        run: python -m pip install --disable-pip-version-check platformio==6.1.19
+
+      - name: Build CoreS3 firmware
+        run: pio run --environment m5stack-cores3
+
+      - name: Prepare merged firmware and Pages site
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          BUILD_DIR=".pio/build/m5stack-cores3"
+          ESPTOOL="$(find "${HOME}/.platformio/packages/tool-esptoolpy" -maxdepth 2 -type f -name esptool.py -print -quit)"
+          BOOT_APP0="$(find "${HOME}/.platformio/packages/framework-arduinoespressif32/tools/partitions" -type f -name boot_app0.bin -print -quit)"
+
+          test -s "${BUILD_DIR}/bootloader.bin"
+          test -s "${BUILD_DIR}/partitions.bin"
+          test -s "${BUILD_DIR}/firmware.bin"
+          test -n "${ESPTOOL}"
+          test -s "${BOOT_APP0}"
+
+          rm -rf site
+          mkdir -p site/firmware
+          cp -a web/. site/
+
+          python "${ESPTOOL}" --chip esp32s3 merge_bin \
+            -o site/firmware/cores3-android-dualsense-bridge.bin \
+            --flash_mode qio \
+            --flash_freq 80m \
+            --flash_size 16MB \
+            0x0 "${BUILD_DIR}/bootloader.bin" \
+            0x8000 "${BUILD_DIR}/partitions.bin" \
+            0xe000 "${BOOT_APP0}" \
+            0x10000 "${BUILD_DIR}/firmware.bin"
+
+          test -s site/firmware/cores3-android-dualsense-bridge.bin
+          sha256sum site/firmware/cores3-android-dualsense-bridge.bin > site/firmware/cores3-android-dualsense-bridge.bin.sha256
+
+          VERSION="${GITHUB_SHA::7}"
+          cat > site/manifest.json <<EOF
+          {
+            "name": "CoreS3 Android DualSense Bridge",
+            "version": "${VERSION}",
+            "new_install_prompt_erase": true,
+            "new_install_improv_wait_time": 0,
+            "builds": [
+              {
+                "chipFamily": "ESP32-S3",
+                "parts": [
+                  {
+                    "path": "firmware/cores3-android-dualsense-bridge.bin",
+                    "offset": 0
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+          python -m json.tool site/manifest.json >/dev/null
+
+          cat > site/build-info.json <<EOF
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "commit": "${GITHUB_SHA}",
+            "runNumber": "${GITHUB_RUN_NUMBER}",
+            "runId": "${GITHUB_RUN_ID}"
+          }
+          EOF
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: cores3-android-dualsense-bridge-${{ github.run_number }}
+          path: |
+            site/firmware/cores3-android-dualsense-bridge.bin
+            site/firmware/cores3-android-dualsense-bridge.bin.sha256
+            site/manifest.json
+            site/build-info.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Configure Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
