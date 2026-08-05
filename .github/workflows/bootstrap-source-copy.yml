@@ -1,0 +1,48 @@
+name: Bootstrap source copy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/bootstrap-source-copy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  copy-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout destination repository
+        uses: actions/checkout@v6
+
+      - name: Copy source repository without modifying implementation
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          SOURCE_DIR="$(mktemp -d)"
+          git clone --depth 1 https://github.com/temesotejam/cores3-android-dualsense-bridge.git "${SOURCE_DIR}"
+
+          rm -rf LICENSE README.md include platformio.ini src
+          cp -a "${SOURCE_DIR}/.gitignore" .gitignore
+          cp -a "${SOURCE_DIR}/LICENSE" LICENSE
+          cp -a "${SOURCE_DIR}/README.md" README.md
+          cp -a "${SOURCE_DIR}/include" include
+          cp -a "${SOURCE_DIR}/platformio.ini" platformio.ini
+          cp -a "${SOURCE_DIR}/src" src
+
+          git add .gitignore LICENSE README.md include platformio.ini src
+          if git diff --cached --quiet; then
+            echo "Source files are already identical."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Copy CoreS3 DualSense bridge source"
+          git push
